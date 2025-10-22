@@ -191,22 +191,7 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 
 	const { request, params } = context;
 	const url = new URL(request.url, API_BASE_URL);
-	const { searchParams, pathname } = url;
-
-	// 记录请求日志
-	console.log(`[${new Date().toISOString()}] GET ${pathname}`);
-
-	// if (!endpoint || id) {
-	// 	return await handleNormalPath(endpoint, id);
-	// }
-
-	// if (!endpoint) {
-	// 	return new Response(JSON.stringify({ error: "Endpoint is required" }), {
-	// 		status: 400,
-	// 		headers: RESPONSE_HEADERS,
-	// 	});
-	// }
-	// return await handleEndpointListRequest(endpoint, searchParams);
+	const { searchParams } = url;
 	return await handleDataRequest(params.default ?? [], searchParams);
 }
 
