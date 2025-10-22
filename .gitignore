@@ -1,0 +1,7 @@
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+!.edgeone/project.json
+.tef_dist/*
+
+node_modules/*

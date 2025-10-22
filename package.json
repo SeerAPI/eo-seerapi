@@ -1,0 +1,20 @@
+{
+  "name": "eo-seerapi",
+  "version": "1.0.0",
+  "description": "SeerAPI主服务，部署在腾讯云EdgeOne Pages上",
+  "license": "MIT",
+  "author": "Nattsu39",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "got": "^14.6.0"
+  },
+  "volta": {
+    "node": "22.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.12"
+  }
+}
