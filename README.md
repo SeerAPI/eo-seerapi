@@ -24,16 +24,15 @@ EO-SeerAPI 是一个基于腾讯云 EdgeOne Pages 的边缘函数服务，为赛
 ## 📁 项目结构
 
 ```
-edgeone-test/
+eo-seerapi/
 ├── node-functions/          # EdgeOne Pages Functions
-│   └── api/
-│       └── v1/              # API v1 版本
-│           ├── [[default]].ts        # 主要数据接口处理器
-│           ├── index.ts              # 导出接口
-│           ├── _common.ts            # 公共工具和配置
-│           └── schemas/              # Schema 接口
-│               ├── [[default]].ts    # Schema 处理器
-│               └── index.ts          # 导出接口
+│   └── v1/
+│       ├── [[default]].ts        # 主要数据接口处理器
+│       ├── index.ts              # 导出接口
+│       ├── _common.ts            # 公共工具和配置
+│       └── schemas/              # Schema 接口
+│           ├── [[default]].ts    # Schema 处理器
+│           └── index.ts          # 导出接口
 ├── edgeone.json             # EdgeOne 配置文件
 ├── package.json             # 项目依赖配置
 ├── tsconfig.json            # TypeScript 配置
