@@ -181,23 +181,18 @@ async function handleDataRequest(
 	);
 }
 
-/**
- * EdgeOne Pages Function Handler - 处理 GET 请求
- */
-export async function onRequest(context: EventContext): Promise<Response> {
-	if (!API_DATA_BASE_URL || !API_BASE_URL) {
-		return new Response(JSON.stringify({ error: "API_DATA_BASE_URL or API_BASE_URL is not set" }), {
-			status: 500,
-			headers: RESPONSE_HEADERS,
-		});
-	}
-
-	const { request, params } = context;
-
+async function handleRequest1(request: EdgeOneRequest): Promise<Response> {
 	return new Response(JSON.stringify({ headers: request.headers, url: request.url }), {
 		status: 200,
 		headers: RESPONSE_HEADERS,
 	});
+}
+
+/**
+ * EdgeOne Pages Function Handler - 处理 GET 请求
+ */
+export function onRequest(context: EventContext): Promise<Response> {
+	return handleRequest1(context.request);
 	// const url = new URL(request.url, API_BASE_URL);
 	// const { searchParams } = url;
 	// return await handleDataRequest(params.default ?? [], request, searchParams);
