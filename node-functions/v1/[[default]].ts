@@ -193,8 +193,10 @@ export async function onRequest(context: EventContext): Promise<Response> {
 	}
 
 	const { request, params } = context;
-	return new Response(JSON.stringify(request.headers), {
+
+	return new Response(JSON.stringify({ headers: request.headers, url: request.url }), {
 		status: 200,
+		headers: RESPONSE_HEADERS,
 	});
 	// const url = new URL(request.url, API_BASE_URL);
 	// const { searchParams } = url;
