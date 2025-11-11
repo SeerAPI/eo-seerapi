@@ -193,9 +193,12 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 	}
 
 	const { request, params } = context;
-	const url = new URL(request.url, API_BASE_URL);
-	const { searchParams } = url;
-	return await handleDataRequest(params.default ?? [], request, searchParams);
+	return new Response(JSON.stringify(request.headers), {
+		status: 200,
+	});
+	// const url = new URL(request.url, API_BASE_URL);
+	// const { searchParams } = url;
+	// return await handleDataRequest(params.default ?? [], request, searchParams);
 }
 
 export async function onRequestOptions() {
