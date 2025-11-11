@@ -126,10 +126,12 @@ function dataIsPageData(data: any): data is PageData {
 
 async function handleDataRequest(
 	path: string[],
+	request: Request,
 	queryParams: URLSearchParams = new URLSearchParams()
 ): Promise<Response> {
 	return await handleRequest(
 		buildUrl(API_DATA_BASE_URL, [...path, 'index.json']),
+		request,
 		(data) => {
 			const schemaUrl = buildUrl(
 				API_BASE_URL,
@@ -192,7 +194,7 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 	const { request, params } = context;
 	const url = new URL(request.url, API_BASE_URL);
 	const { searchParams } = url;
-	return await handleDataRequest(params.default ?? [], searchParams);
+	return await handleDataRequest(params.default ?? [], request, searchParams);
 }
 
 export async function onRequestOptions() {

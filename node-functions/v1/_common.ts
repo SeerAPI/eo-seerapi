@@ -50,14 +50,22 @@ export const RESPONSE_HEADERS = {
 };
 
 /**
- * 从响应中提取 ETag
+ * 从数据或后端响应头中提取 ETag
  */
-export function extractEtag(data: any, responseHeaders: Record<string, any>): string {
+export function extractEtagFromBackend(data: any, responseHeaders: Record<string, any>): string {
 	return (
 		data.hash
 		|| responseHeaders['etag']
 		|| Date.now().toString()
 	);
+}
+
+
+/**
+ * 从请求头中提取 ETag
+ */
+export function getEtagFromRequest(request: Request): string {
+	return request.headers.get('If-None-Match') || '';
 }
 
 /**
@@ -87,19 +95,33 @@ export function createSuccessResponse(
 }
 
 /**
+ * 创建 304 响应
+ */
+export function createNotModifiedResponse(): Response {
+	return new Response(null, {
+		status: 304,
+		headers: RESPONSE_HEADERS,
+	});
+}
+
+/**
  * 通用请求处理包装器
  */
 export async function handleRequest<T>(
 	url: string | URL,
+	request: Request,
 	transformer: (data: T, etag: string) => { body: any; headers?: Record<string, string> }
 ): Promise<Response> {
 	try {
 		const response = await gotClient.get(url);
 		const data: T = JSON.parse(response.body);
-		const etag = extractEtag(data, response.headers);
+		const etag = extractEtagFromBackend(data, response.headers);
+
+		if (getEtagFromRequest(request) === etag) {
+			return createNotModifiedResponse();
+		}
 
 		const { body, headers = {} } = transformer(data, etag);
-
 		return createSuccessResponse(
 			body,
 			response.statusCode || 200,

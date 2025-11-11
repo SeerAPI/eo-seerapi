@@ -8,11 +8,11 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 		});
 	}
 
-	const { params } = context;
+	const { params, request } = context;
 
 	const schemaUrl = buildUrl(API_SCHEMA_BASE_URL, params.default ?? []);
 	schemaUrl.pathname += "/index.json";
-	return await handleRequest(schemaUrl, (data) => {
+	return await handleRequest(schemaUrl, request, (data) => {
 		return {
 			body: data,
 			headers: {
