@@ -4,7 +4,8 @@ import {
 	handleRequest,
 	RESPONSE_HEADERS,
 	type EventContext,
-	buildUrl
+	buildUrl,
+	type EdgeOneRequest
 } from "./_common.js";
 
 
@@ -126,7 +127,7 @@ function dataIsPageData(data: any): data is PageData {
 
 async function handleDataRequest(
 	path: string[],
-	request: Request,
+	request: EdgeOneRequest,
 	queryParams: URLSearchParams = new URLSearchParams()
 ): Promise<Response> {
 	return await handleRequest(

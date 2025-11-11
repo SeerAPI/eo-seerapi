@@ -37,8 +37,17 @@ const gotConfig: ExtendOptions = {
 
 export const gotClient = got.extend(gotConfig);
 
+interface RequestHeaders {
+	[key: string]: string;
+}
+
+export interface EdgeOneRequest {
+	headers: RequestHeaders;
+	url: string;
+}
+
 export interface EventContext {
-	request: Request;
+	request: EdgeOneRequest;
 	env: Record<string, string>;
 	params: Record<string, any>;
 }
@@ -64,8 +73,8 @@ export function extractEtagFromBackend(data: any, responseHeaders: Record<string
 /**
  * 从请求头中提取 ETag
  */
-export function getEtagFromRequest(request: Request): string {
-	return request.headers.get('If-None-Match') || '';
+export function getEtagFromRequest(request: EdgeOneRequest): string {
+	return request.headers['if-none-match'] || '';
 }
 
 /**
@@ -109,7 +118,7 @@ export function createNotModifiedResponse(): Response {
  */
 export async function handleRequest<T>(
 	url: string | URL,
-	request: Request,
+	request: EdgeOneRequest,
 	transformer: (data: T, etag: string) => { body: any; headers?: Record<string, string> }
 ): Promise<Response> {
 	try {
