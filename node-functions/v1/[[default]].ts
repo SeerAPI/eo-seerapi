@@ -184,7 +184,7 @@ async function handleDataRequest(
 /**
  * EdgeOne Pages Function Handler - 处理 GET 请求
  */
-export async function onRequestGet(context: EventContext): Promise<Response> {
+export async function onRequest(context: EventContext): Promise<Response> {
 	if (!API_DATA_BASE_URL || !API_BASE_URL) {
 		return new Response(JSON.stringify({ error: "API_DATA_BASE_URL or API_BASE_URL is not set" }), {
 			status: 500,
