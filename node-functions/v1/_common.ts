@@ -74,6 +74,8 @@ export function extractEtagFromBackend(data: any, responseHeaders: Record<string
  * 从请求头中提取 ETag
  */
 export function getEtagFromRequest(request: EdgeOneRequest): string {
+	console.log(request.headers);
+
 	return request.headers['if-none-match'] || '';
 }
 
