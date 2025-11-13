@@ -127,6 +127,7 @@ export async function handleRequest<T>(
 		const response = await gotClient.get(url);
 		const data: T = JSON.parse(response.body);
 		const etag = extractEtagFromBackend(data, response.headers);
+		console.log('remoteEtag: ', etag,);
 
 		if (getEtagFromRequest(request) === etag) {
 			return createNotModifiedResponse();

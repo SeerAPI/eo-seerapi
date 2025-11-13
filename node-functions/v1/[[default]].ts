@@ -5,7 +5,8 @@ import {
 	RESPONSE_HEADERS,
 	type EventContext,
 	buildUrl,
-	type EdgeOneRequest
+	type EdgeOneRequest,
+	extractEtagFromBackend
 } from "./_common.js";
 
 
@@ -140,7 +141,9 @@ async function handleDataRequest(
 			);
 			if (!dataIsPageData(data)) {
 				return {
-					body: data,
+					body: {
+						headers: Object.fromEntries(request.headers.entries()),
+					},
 					headers: {
 						'Link': `<${schemaUrl}>; rel="describedby"`,
 						'Content-Type': 'application/schema-instance+json',
@@ -182,7 +185,8 @@ async function handleDataRequest(
 }
 
 async function handleRequest1(request: EdgeOneRequest): Promise<Response> {
-	return new Response(JSON.stringify({ headers: request.headers, url: request.url }), {
+	const headers = Object.fromEntries(request.headers.entries());
+	return new Response(JSON.stringify(headers), {
 		status: 200,
 		headers: RESPONSE_HEADERS,
 	});
@@ -191,11 +195,12 @@ async function handleRequest1(request: EdgeOneRequest): Promise<Response> {
 /**
  * EdgeOne Pages Function Handler - 处理 GET 请求
  */
-export function onRequest(context: EventContext): Promise<Response> {
-	return handleRequest1(context.request);
-	// const url = new URL(request.url, API_BASE_URL);
-	// const { searchParams } = url;
-	// return await handleDataRequest(params.default ?? [], request, searchParams);
+export async function onRequestGet(context: EventContext): Promise<Response> {
+	// return handleRequest1(context.request);
+	const { params, request } = context;
+	const url = new URL(request.url, API_BASE_URL);
+	const { searchParams } = url;
+	return await handleDataRequest(params.default ?? [], request, searchParams);
 }
 
 export async function onRequestOptions() {
