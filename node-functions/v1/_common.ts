@@ -38,9 +38,7 @@ const gotConfig: ExtendOptions = {
 export const gotClient = got.extend(gotConfig);
 
 export interface EdgeOneRequest {
-	headers: Record<string, string> & {
-		entries(): IterableIterator<[string, string]>;
-	};
+	headers: Headers;
 	url: string;
 }
 
@@ -72,7 +70,7 @@ export function extractEtagFromBackend(data: any, responseHeaders: Record<string
  * 从请求头中提取 ETag
  */
 export function getEtagFromRequest(request: EdgeOneRequest): string {
-	return request.headers['if-none-match'] || '';
+	return request.headers.get('if-none-match') || request.headers.get('If-None-Match') || '';
 }
 
 /**
@@ -122,19 +120,20 @@ export async function handleRequest<T>(
 	try {
 		const response = await gotClient.get(url);
 		const data: T = JSON.parse(response.body);
-		const headers = Object.fromEntries(request.headers.entries());
-		const etag = extractEtagFromBackend(data, headers);
+		const remoteEtag = extractEtagFromBackend(data, response.headers);
+		const requestEtag = getEtagFromRequest(request);
+		console.log(`requestEtag: ${requestEtag}, remoteEtag: ${remoteEtag}`);
 
-		if (getEtagFromRequest(request) === etag) {
+		if (requestEtag === remoteEtag) {
 			return createNotModifiedResponse();
 		}
 
-		const { body, headers: responseHeaders = {} } = transformer(data, etag);
+		const { body, headers: responseHeaders = {} } = transformer(data, remoteEtag);
 		return createSuccessResponse(
 			body,
 			response.statusCode || 200,
 			response.statusMessage || 'OK',
-			{ ...responseHeaders, 'ETag': etag }
+			{ ...responseHeaders, 'ETag': remoteEtag }
 		);
 	} catch (e: any) {
 		return createErrorResponse(e);
