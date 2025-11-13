@@ -37,12 +37,10 @@ const gotConfig: ExtendOptions = {
 
 export const gotClient = got.extend(gotConfig);
 
-interface RequestHeaders {
-	[key: string]: string;
-}
-
 export interface EdgeOneRequest {
-	headers: RequestHeaders;
+	headers: Record<string, string> & {
+		entries(): IterableIterator<[string, string]>;
+	};
 	url: string;
 }
 
@@ -124,18 +122,19 @@ export async function handleRequest<T>(
 	try {
 		const response = await gotClient.get(url);
 		const data: T = JSON.parse(response.body);
-		const etag = extractEtagFromBackend(data, response.headers);
+		const headers = Object.fromEntries(request.headers.entries());
+		const etag = extractEtagFromBackend(data, headers);
 
 		if (getEtagFromRequest(request) === etag) {
 			return createNotModifiedResponse();
 		}
 
-		const { body, headers = {} } = transformer(data, etag);
+		const { body, headers: responseHeaders = {} } = transformer(data, etag);
 		return createSuccessResponse(
 			body,
 			response.statusCode || 200,
 			response.statusMessage || 'OK',
-			{ ...headers, 'ETag': etag }
+			{ ...responseHeaders, 'ETag': etag }
 		);
 	} catch (e: any) {
 		return createErrorResponse(e);
