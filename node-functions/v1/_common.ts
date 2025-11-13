@@ -125,6 +125,7 @@ export async function handleRequest<T>(
 		console.log(`requestEtag: ${requestEtag}, remoteEtag: ${remoteEtag}`);
 
 		if (requestEtag === remoteEtag) {
+			console.log('not modified, return 304');
 			return createNotModifiedResponse();
 		}
 
