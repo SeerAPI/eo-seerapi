@@ -121,20 +121,20 @@ export async function handleRequest<T>(
 		const response = await gotClient.get(url);
 		const data: T = JSON.parse(response.body);
 		const remoteEtag = extractEtagFromBackend(data, response.headers);
-		const requestEtag = getEtagFromRequest(request);
-		console.log(`requestEtag: ${requestEtag}, remoteEtag: ${remoteEtag}`);
+		// const requestEtag = getEtagFromRequest(request);
+		// console.log(`requestEtag: ${requestEtag}, remoteEtag: ${remoteEtag}`);
 
-		if (requestEtag === remoteEtag) {
-			console.log('not modified, return 304');
-			return createNotModifiedResponse();
-		}
+		// if (requestEtag === remoteEtag) {
+		// 	console.log('not modified, return 304');
+		// 	return createNotModifiedResponse();
+		// }
 
 		const { body, headers: responseHeaders = {} } = transformer(data, remoteEtag);
 		return createSuccessResponse(
 			body,
 			response.statusCode || 200,
 			response.statusMessage || 'OK',
-			{ ...responseHeaders, 'ETag': remoteEtag }
+			{ ...responseHeaders }
 		);
 	} catch (e: any) {
 		return createErrorResponse(e);
