@@ -5,3 +5,5 @@
 .tef_dist/*
 
 node_modules/*
+
+build/*

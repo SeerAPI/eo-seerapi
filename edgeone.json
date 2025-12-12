@@ -1,4 +1,6 @@
 {
 	"name": "eo-seerapi",
-	"nodeVersion": "22.11.0"
+	"nodeVersion": "22.11.0",
+	"buildCommand": "npm run build",
+	"outputDirectory": "build"
 }
