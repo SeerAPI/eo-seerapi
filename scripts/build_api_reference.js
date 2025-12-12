@@ -21,7 +21,6 @@ function buildApiReference() {
     <script>
         Scalar.createApiReference('#app', {
         url: '${API_DATA_BASE_URL}',
-        proxyUrl: 'https://proxy.scalar.com'
         })
     </script>
     </body>
