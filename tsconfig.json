@@ -6,7 +6,8 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "lib": [
-      "esnext"
+      "esnext",
+      "dom"
     ],
     "target": "esnext",
     "types": [],

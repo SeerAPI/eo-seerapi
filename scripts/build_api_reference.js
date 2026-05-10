@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-const API_DATA_BASE_URL = process.env.OAD_URL;
+const API_DATA_BASE_URL = env.OAD_URL;
 
 function buildApiReference() {
     if (!API_DATA_BASE_URL) throw new Error('OAD_URL is not set');

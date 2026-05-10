@@ -133,7 +133,7 @@ async function handleDataRequest(
 	return await handleRequest(
 		buildUrl(API_DATA_BASE_URL, [...path, 'index.json']),
 		request,
-		(data) => {
+		(data, etag) => {
 			const schemaUrl = buildUrl(
 				API_BASE_URL,
 				['schemas', ...path.map(p => /^\d+$/.test(p) ? '$id' : p)]
@@ -144,6 +144,7 @@ async function handleDataRequest(
 					headers: {
 						'Link': `<${schemaUrl}>; rel="describedby"`,
 						'Content-Type': 'application/schema-instance+json',
+						'ETag': etag,
 					}
 				};
 			}
