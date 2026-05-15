@@ -1,4 +1,4 @@
-import { API_BASE_URL, API_SCHEMA_BASE_URL, buildUrl, handleRequest, RESPONSE_HEADERS, type EventContext } from "../_common.js";
+import { API_BASE_URL, API_SCHEMA_BASE_URL, buildUrl, handleRequest, RESPONSE_HEADERS, type EventContext, toPathArray } from "../_common.js";
 
 export async function onRequestGet(context: EventContext): Promise<Response> {
 	if (!API_SCHEMA_BASE_URL || !API_BASE_URL) {
@@ -9,8 +9,9 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 	}
 
 	const { params, request } = context;
+	const pathArray = toPathArray(params.default);
 
-	const schemaUrl = buildUrl(API_SCHEMA_BASE_URL, params.default ?? []);
+	const schemaUrl = buildUrl(API_SCHEMA_BASE_URL, pathArray);
 	schemaUrl.pathname += "/index.json";
 	return await handleRequest(schemaUrl, request, (data) => {
 		return {

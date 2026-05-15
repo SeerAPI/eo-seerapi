@@ -10,7 +10,7 @@ export interface EdgeOneRequest {
 export interface EventContext {
 	request: EdgeOneRequest;
 	env: Record<string, string>;
-	params: Record<string, any>;
+	params: Record<string, string | string[]>;
 }
 
 export const RESPONSE_HEADERS = {
@@ -109,6 +109,15 @@ export async function handleRequest<T>(
 	} catch (e: any) {
 		return createErrorResponse(e);
 	}
+}
+
+/**
+ * 将路由参数值统一转换为字符串数组
+ */
+export function toPathArray(param: string | string[] | undefined): string[] {
+	if (typeof param === 'string') return [param];
+	if (Array.isArray(param)) return [...param];
+	return [];
 }
 
 export function buildUrl(baseUrl: string | URL, path: string[] = []): URL {

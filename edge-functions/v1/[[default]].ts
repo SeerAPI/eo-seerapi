@@ -5,7 +5,8 @@ import {
 	RESPONSE_HEADERS,
 	type EventContext,
 	buildUrl,
-	type EdgeOneRequest
+	type EdgeOneRequest,
+	toPathArray
 } from "./_common.js";
 
 
@@ -194,9 +195,11 @@ export async function onRequestGet(context: EventContext): Promise<Response> {
 	}
 
 	const { request, params } = context;
+	const pathArray = toPathArray(params.default);
+
 	const url = new URL(request.url, API_BASE_URL);
 	const { searchParams } = url;
-	return await handleDataRequest(params.default ?? [], request, searchParams);
+	return await handleDataRequest(pathArray, request, searchParams);
 }
 
 export async function onRequestOptions() {
