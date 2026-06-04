@@ -1,5 +1,5 @@
 import { getStore } from "@edgeone/pages-blob";
-import { type EventContext } from "../v1/_common.js";
+import { type EventContext } from "../_common.js";
 
 export async function onRequestGet(context: EventContext): Promise<Response> {
     const store = getStore("test-store");
