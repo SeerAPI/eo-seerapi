@@ -1,3 +1,3 @@
-// import { onRequestGet } from "./[[default]].js";
+import { onRequestGet } from "./[[default]].js";
 
-// export { onRequestGet };
+export { onRequestGet };
