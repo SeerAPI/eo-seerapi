@@ -96,7 +96,6 @@ GET /api/v1/schemas/{resource_path}
 
 **响应头**:
 - `Content-Type`: `application/schema+json`
-- `ETag`: Schema 版本标识
 
 **响应示例**:
 ```json
