@@ -13,6 +13,10 @@
     "node": "22.11.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.18"
+    "@types/node": "^22.19.19"
+  },
+  "dependencies": {
+    "@edgeone/pages-blob": "^0.0.11",
+    "edgeone": "^1.5.9"
   }
 }
