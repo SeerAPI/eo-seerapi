@@ -34,8 +34,13 @@ interface ShardNameIndex {
 
 type DataStore = ReturnType<typeof getStore>;
 
-function buildCollectionEtag(resourceHash: string, expand: boolean): string {
-    return expand ? `${resourceHash}-expanded` : resourceHash;
+function buildPageEtag(resourceHash: string, pageParam: PageQueryParam): string {
+    const expandSuffix = pageParam.expand ? '-expanded' : '';
+    return `${resourceHash}-${pageParam.offset}-${pageParam.limit}${expandSuffix}`;
+}
+
+function getSortedIdKeys(byId: Record<string, string>): string[] {
+    return Object.keys(byId).sort((a, b) => Number(a) - Number(b));
 }
 
 async function getShardIdIndex(store: DataStore, resourceName: string): Promise<ShardIdIndex | null> {
@@ -44,6 +49,18 @@ async function getShardIdIndex(store: DataStore, resourceName: string): Promise<
 
 async function getShardNameIndex(store: DataStore, resourceName: string): Promise<ShardNameIndex | null> {
     return store.get(`sharded_data/${resourceName}/name-index.json`, { type: 'json' });
+}
+
+async function tryGetResourceHash(store: DataStore, resourceName: string): Promise<string | null> {
+    const hash = await store.get(`sharded_data/${resourceName}/resource.hash`, { type: 'text' });
+    return hash ? hash.trim() : null;
+}
+
+function tryNotModifiedResponse(requestEtag: string, etag: string): Response | null {
+    if (etagMatches(requestEtag, etag)) {
+        return createNotModifiedResponse(etag);
+    }
+    return null;
 }
 
 async function fetchShardRecord(
@@ -238,11 +255,32 @@ async function handleDataRequest(
             await store.get(`sharded_data/index.json`, { type: 'json' })
         );
     }
-    const idIndex = await getShardIdIndex(store, resource_name);
     const requestEtag = getEtagFromRequest(request);
 
     // 如果没有二级路径，则查找一级路径是资源名称还是文件名称，
     if (!name) {
+        const pageParam = {
+            offset: parseInt(queryParams.get('offset') || '0') || 0,
+            limit: parseInt(queryParams.get('limit') || '20') || 20,
+            expand: parseExpandQueryParam(queryParams),
+        };
+        if (pageParam.limit > 200) {
+            return new Response(JSON.stringify({ error: "Limit is too large" }), {
+                status: 400,
+                headers: RESPONSE_HEADERS,
+            });
+        }
+
+        // 快速路径：仅读取 resource.hash 即可完成条件请求，跳过 id-index.json
+        const resourceHash = await tryGetResourceHash(store, resource_name);
+        if (resourceHash) {
+            const earlyResponse = tryNotModifiedResponse(requestEtag, buildPageEtag(resourceHash, pageParam));
+            if (earlyResponse) {
+                return earlyResponse;
+            }
+        }
+
+        const idIndex = await getShardIdIndex(store, resource_name);
         // 如果id索引不存在，则尝试直接返回文件
         if (!idIndex) {
             const data = await store.get(`sharded_data/${resource_name}.json`, { type: 'json' });
@@ -255,24 +293,17 @@ async function handleDataRequest(
                 'Content-Type': 'application/schema-instance+json',
             });
         }
-        // 如果是资源名称，则返回分页数据
-        const pageParam = {
-            offset: parseInt(queryParams.get('offset') || '0') || 0,
-            limit: parseInt(queryParams.get('limit') || '20') || 20,
-            expand: parseExpandQueryParam(queryParams),
-        };
-        if (pageParam.limit > 200) {
-            return new Response(JSON.stringify({ error: "Limit is too large" }), {
-                status: 400,
-                headers: RESPONSE_HEADERS,
-            });
+
+        const hash = resourceHash ?? idIndex.resource_hash;
+        if (!resourceHash) {
+            const notModified = tryNotModifiedResponse(requestEtag, buildPageEtag(hash, pageParam));
+            if (notModified) {
+                return notModified;
+            }
         }
-        const pageEtag = buildCollectionEtag(idIndex.resource_hash, pageParam.expand);
-        if (etagMatches(requestEtag, pageEtag)) {
-            return createNotModifiedResponse(pageEtag);
-        }
+
         const url = buildUrl(API_BASE_URL, [resource_name]);
-        const idKeys = Object.keys(idIndex.by_id);
+        const idKeys = getSortedIdKeys(idIndex.by_id);
         const count = idKeys.length;
 
         const nextUrl = buildPageUrl(url, getNextPage(pageParam, count));
@@ -286,6 +317,7 @@ async function handleDataRequest(
                 id: parseInt(idStr),
                 url: buildUrl(API_BASE_URL, [resource_name, idStr]).toString(),
             }));
+        const pageEtag = buildPageEtag(hash, pageParam);
         const schemaUrl = buildUrl(API_BASE_URL, ['schemas', resource_name]);
         return createSuccessResponse(
             {
@@ -295,7 +327,7 @@ async function handleDataRequest(
                 first: firstUrl,
                 last: lastUrl,
                 results,
-                hash: idIndex.resource_hash,
+                hash,
             },
             200,
             'OK',
@@ -306,16 +338,29 @@ async function handleDataRequest(
             }
         );
     }
+
+    const resourceHash = await tryGetResourceHash(store, resource_name);
+    if (resourceHash) {
+        const earlyResponse = tryNotModifiedResponse(requestEtag, resourceHash);
+        if (earlyResponse) {
+            return earlyResponse;
+        }
+    }
+
+    const idIndex = await getShardIdIndex(store, resource_name);
     if (!idIndex) {
         return createNotFoundResponse();
     }
 
-    const resourceEtag = idIndex.resource_hash;
+    const hash = resourceHash ?? idIndex.resource_hash;
+    if (!resourceHash) {
+        const notModified = tryNotModifiedResponse(requestEtag, hash);
+        if (notModified) {
+            return notModified;
+        }
+    }
 
     if (stringIsInteger(name)) {
-        if (etagMatches(requestEtag, resourceEtag)) {
-            return createNotModifiedResponse(resourceEtag);
-        }
         const record = await fetchShardRecordById(store, resource_name, name, idIndex);
         if (record === null) {
             return createNotFoundResponse();
@@ -323,7 +368,7 @@ async function handleDataRequest(
         const schemaUrl = buildUrl(API_BASE_URL, ['schemas', resource_name, '$id']);
         return createSuccessResponse(record, 200, 'OK', {
             'Link': `<${schemaUrl}>; rel="describedby"`,
-            'ETag': formatEtag(resourceEtag),
+            'ETag': formatEtag(hash),
             'Content-Type': 'application/schema-instance+json',
         });
     }
@@ -331,10 +376,6 @@ async function handleDataRequest(
     const nameIndex = await getShardNameIndex(store, resource_name);
     if (!nameIndex) {
         return createNotFoundResponse();
-    }
-
-    if (etagMatches(requestEtag, resourceEtag)) {
-        return createNotModifiedResponse(resourceEtag);
     }
 
     const result = await fetchShardRecordsByName(store, resource_name, name, idIndex, nameIndex);
@@ -345,7 +386,7 @@ async function handleDataRequest(
     const schemaUrl = buildUrl(API_BASE_URL, ['schemas', resource_name, '$name']);
     return createSuccessResponse(result, 200, 'OK', {
         'Link': `<${schemaUrl}>; rel="describedby"`,
-        'ETag': formatEtag(resourceEtag),
+        'ETag': formatEtag(hash),
         'Content-Type': 'application/schema-instance+json',
     });
 }
