@@ -47,11 +47,17 @@ function getRequestHeader(
   return "";
 }
 
+/** EdgeOne 回源时会剥离 If-None-Match，由 middleware 复制到此头透传 */
+const ETAG_FALLBACK_HEADER = "x-if-none-match";
+
 /**
- * 从请求头中提取 If-None-Match
+ * 从请求头中提取 If-None-Match（含 middleware 透传的 X-If-None-Match）
  */
 export function getEtagFromRequest(request: EdgeOneRequest): string {
-  return getRequestHeader(request.headers, "if-none-match");
+  return (
+    getRequestHeader(request.headers, "if-none-match") ||
+    getRequestHeader(request.headers, ETAG_FALLBACK_HEADER)
+  );
 }
 
 /**
