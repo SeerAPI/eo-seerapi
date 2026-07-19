@@ -21,8 +21,8 @@ on:
   repository_dispatch:
     types: [api-data-updated]
   # 可选：定时同步最新数据
-  schedule:
-    - cron: "0 4 * * *" # 每天 12:00 CST (UTC+8)
+  #   schedule:
+  #     - cron: "0 4 * * *" # 每天 12:00 CST (UTC+8)
 
 concurrency:
   group: deploy-makers-${{ github.event.inputs.environment || 'production' }}
