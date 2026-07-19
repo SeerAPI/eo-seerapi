@@ -75,10 +75,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
-        env:
-          OAD_URL: ${{ secrets.OAD_URL }}
+    #   - name: Build project
+    #     run: npm run build
+    #     env:
+    #       OAD_URL: ${{ secrets.OAD_URL }}
 
       - name: Deploy to EdgeOne Makers
         run: |
@@ -92,3 +92,4 @@ jobs:
             --json
         env:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          OAD_URL: ${{ secrets.OAD_URL }}
