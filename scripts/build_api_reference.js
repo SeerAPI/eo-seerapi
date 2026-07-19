@@ -1,10 +1,11 @@
 import fs from 'fs';
 
-const OAD_URL = process.env.OAD_URL;
+/** 远端构建无 .env 时使用；本地/CI 可用环境变量覆盖 */
+const DEFAULT_OAD_URL =
+  'https://cdn.jsdelivr.net/gh/SeerAPI/api-data@refs/heads/main/data/v1/openapi.json';
+const OAD_URL = process.env.OAD_URL || DEFAULT_OAD_URL;
 
 function buildApiReference() {
-    if (!OAD_URL) throw new Error('OAD_URL is not set');
-
     const API_REFERENCE_HTML = `<!doctype html>
     <html>
 
