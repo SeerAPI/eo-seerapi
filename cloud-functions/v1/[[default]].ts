@@ -4,6 +4,7 @@ import {
   type EventContext,
   buildUrl,
   createSuccessResponse,
+  createRawJsonResponse,
   createNotFoundResponse,
   stringIsInteger,
   handlePathParam,
@@ -13,7 +14,7 @@ import {
   formatEtag,
   type EdgeOneRequest,
 } from "./_common.js";
-import { getStore } from "@edgeone/pages-blob";
+import { getData } from "./_data.js";
 
 interface PageQueryParam {
   offset: number;
@@ -31,8 +32,6 @@ interface ShardNameIndex {
   // resource_hash: string;
 }
 
-type DataStore = ReturnType<typeof getStore>;
-
 function buildPageEtag(
   resourceHash: string,
   pageParam: PageQueryParam,
@@ -46,28 +45,25 @@ function getSortedIdKeys(byId: Record<string, string>): string[] {
 }
 
 async function getShardIdIndex(
-  store: DataStore,
   resourceName: string,
 ): Promise<ShardIdIndex | null> {
-  return store.get(`sharded_data/${resourceName}/id-index.json`, {
+  return await getData(`sharded_data/${resourceName}/id-index.json`, {
     type: "json",
   });
 }
 
 async function getShardNameIndex(
-  store: DataStore,
   resourceName: string,
 ): Promise<ShardNameIndex | null> {
-  return store.get(`sharded_data/${resourceName}/name-index.json`, {
+  return await getData(`sharded_data/${resourceName}/name-index.json`, {
     type: "json",
   });
 }
 
 async function tryGetResourceHash(
-  store: DataStore,
   resourceName: string,
 ): Promise<string | null> {
-  const hash = await store.get(`sharded_data/${resourceName}/resource.hash`, {
+  const hash = await getData(`sharded_data/${resourceName}/resource.hash`, {
     type: "text",
   });
   return hash ? hash.trim() : null;
@@ -84,12 +80,11 @@ function tryNotModifiedResponse(
 }
 
 async function fetchShardRecord(
-  store: DataStore,
   resourceName: string,
   shardFilename: string,
   id: string,
 ): Promise<any> {
-  const data = await store.get(
+  const data = await getData(
     `sharded_data/${resourceName}/id/shards/${shardFilename}.json`,
     { type: "json" },
   );
@@ -100,7 +95,6 @@ async function fetchShardRecord(
 }
 
 async function fetchShardRecordById(
-  store: DataStore,
   resourceName: string,
   id: string,
   idIndex: ShardIdIndex,
@@ -109,11 +103,31 @@ async function fetchShardRecordById(
   if (!shardFilename) {
     return null;
   }
-  return fetchShardRecord(store, resourceName, shardFilename, id);
+  return fetchShardRecord(resourceName, shardFilename, id);
+}
+
+/** 并行加载一批分片文件，返回 shardFilename -> 分片内容 */
+async function loadShardsByFilenames(
+  resourceName: string,
+  shardFilenames: Iterable<string>,
+): Promise<Map<string, Record<string, any>>> {
+  const unique = [...new Set(shardFilenames)];
+  const entries = await Promise.all(
+    unique.map(async (shardFilename) => {
+      const data = await getData(
+        `sharded_data/${resourceName}/id/shards/${shardFilename}.json`,
+        { type: "json" },
+      );
+      if (!data) {
+        throw new Error(`Data not found: ${resourceName}/${shardFilename}`);
+      }
+      return [shardFilename, data] as const;
+    }),
+  );
+  return new Map(entries);
 }
 
 async function fetchShardRecordsByName(
-  store: DataStore,
   resourceName: string,
   name: string,
   idIndex: ShardIdIndex,
@@ -124,42 +138,39 @@ async function fetchShardRecordsByName(
     return null;
   }
   const sortedIds = [...ids].sort((a, b) => a - b);
+  const idStrs = sortedIds.map((id) => id.toString());
+  const shardCache = await loadShardsByFilenames(
+    resourceName,
+    idStrs.map((idStr) => idIndex.by_id[idStr]).filter((s): s is string => !!s),
+  );
+
   const result: Record<string, any> = {};
   for (const id of sortedIds) {
     const idStr = id.toString();
     const shardFilename = idIndex.by_id[idStr];
-    const data = await store.get(
-      `sharded_data/${resourceName}/id/shards/${shardFilename}.json`,
-      { type: "json" },
-    );
-    result[id] = data[idStr];
+    if (!shardFilename) {
+      continue;
+    }
+    result[id] = shardCache.get(shardFilename)![idStr];
   }
   return result;
 }
 
 async function fetchShardRecordsByIds(
-  store: DataStore,
   resourceName: string,
   ids: string[],
   idIndex: ShardIdIndex,
 ): Promise<any[]> {
-  const shardCache = new Map<string, Record<string, any>>();
-  const results: any[] = [];
+  const shardCache = await loadShardsByFilenames(
+    resourceName,
+    ids.map((id) => idIndex.by_id[id]).filter((s): s is string => !!s),
+  );
 
+  const results: any[] = [];
   for (const id of ids) {
     const shardFilename = idIndex.by_id[id];
     if (!shardFilename) {
       continue;
-    }
-    if (!shardCache.has(shardFilename)) {
-      const data = await store.get(
-        `sharded_data/${resourceName}/id/shards/${shardFilename}.json`,
-        { type: "json" },
-      );
-      if (!data) {
-        throw new Error(`Data not found: ${resourceName}/${id}`);
-      }
-      shardCache.set(shardFilename, data);
     }
     results.push(shardCache.get(shardFilename)![id]);
   }
@@ -291,12 +302,14 @@ async function handleDataRequest(
   request: EdgeOneRequest,
   queryParams: URLSearchParams = new URLSearchParams(),
 ): Promise<Response> {
+  const gzip = true;
   const [resource_name, name] = path;
-  const store = getStore("seerapi-v1");
   if (!resource_name) {
-    return createSuccessResponse(
-      await store.get(`sharded_data/index.json`, { type: "json" }),
-    );
+    const raw = await getData(`sharded_data/index.json`, { type: "text" });
+    if (!raw) {
+      return createNotFoundResponse();
+    }
+    return createRawJsonResponse(raw, 200, "OK", {}, { gzip });
   }
   const requestEtag = getEtagFromRequest(request);
 
@@ -315,7 +328,7 @@ async function handleDataRequest(
     }
 
     // 快速路径：仅读取 resource.hash 即可完成条件请求，跳过 id-index.json
-    const resourceHash = await tryGetResourceHash(store, resource_name);
+    const resourceHash = await tryGetResourceHash(resource_name);
     if (resourceHash) {
       const earlyResponse = tryNotModifiedResponse(
         requestEtag,
@@ -326,20 +339,26 @@ async function handleDataRequest(
       }
     }
 
-    const idIndex = await getShardIdIndex(store, resource_name);
+    const idIndex = await getShardIdIndex(resource_name);
     // 如果id索引不存在，则尝试直接返回文件
     if (!idIndex) {
-      const data = await store.get(`sharded_data/${resource_name}.json`, {
-        type: "json",
+      const raw = await getData(`sharded_data/${resource_name}.json`, {
+        type: "text",
       });
-      if (!data) {
+      if (!raw) {
         return createNotFoundResponse();
       }
       const schemaUrl = buildUrl(API_BASE_URL, ["schemas", resource_name]);
-      return createSuccessResponse(data, 200, "OK", {
-        Link: `<${schemaUrl}>; rel="describedby"`,
-        "Content-Type": "application/schema-instance+json",
-      });
+      return createRawJsonResponse(
+        raw,
+        200,
+        "OK",
+        {
+          Link: `<${schemaUrl}>; rel="describedby"`,
+          "Content-Type": "application/schema-instance+json",
+        },
+        { gzip },
+      );
     }
 
     const hash = resourceHash ?? idIndex.resource_hash;
@@ -366,7 +385,7 @@ async function handleDataRequest(
       pageParam.offset + pageParam.limit,
     );
     const results = pageParam.expand
-      ? await fetchShardRecordsByIds(store, resource_name, pageIds, idIndex)
+      ? await fetchShardRecordsByIds(resource_name, pageIds, idIndex)
       : pageIds.map((idStr) => ({
           id: parseInt(idStr),
           url: buildUrl(API_BASE_URL, [resource_name, idStr]).toString(),
@@ -390,10 +409,11 @@ async function handleDataRequest(
         Link: buildLinkHeader(API_BASE_URL, pageParam, count, schemaUrl),
         "Content-Type": "application/schema-instance+json",
       },
+      { gzip },
     );
   }
 
-  const resourceHash = await tryGetResourceHash(store, resource_name);
+  const resourceHash = await tryGetResourceHash(resource_name);
   if (resourceHash) {
     const earlyResponse = tryNotModifiedResponse(requestEtag, resourceHash);
     if (earlyResponse) {
@@ -401,7 +421,7 @@ async function handleDataRequest(
     }
   }
 
-  const idIndex = await getShardIdIndex(store, resource_name);
+  const idIndex = await getShardIdIndex(resource_name);
   if (!idIndex) {
     return createNotFoundResponse();
   }
@@ -415,30 +435,30 @@ async function handleDataRequest(
   }
 
   if (stringIsInteger(name)) {
-    const record = await fetchShardRecordById(
-      store,
-      resource_name,
-      name,
-      idIndex,
-    );
+    const record = await fetchShardRecordById(resource_name, name, idIndex);
     if (record === null) {
       return createNotFoundResponse();
     }
     const schemaUrl = buildUrl(API_BASE_URL, ["schemas", resource_name, "$id"]);
-    return createSuccessResponse(record, 200, "OK", {
-      Link: `<${schemaUrl}>; rel="describedby"`,
-      ETag: formatEtag(hash),
-      "Content-Type": "application/schema-instance+json",
-    });
+    return createSuccessResponse(
+      record,
+      200,
+      "OK",
+      {
+        Link: `<${schemaUrl}>; rel="describedby"`,
+        ETag: formatEtag(hash),
+        "Content-Type": "application/schema-instance+json",
+      },
+      { gzip },
+    );
   }
 
-  const nameIndex = await getShardNameIndex(store, resource_name);
+  const nameIndex = await getShardNameIndex(resource_name);
   if (!nameIndex) {
     return createNotFoundResponse();
   }
 
   const result = await fetchShardRecordsByName(
-    store,
     resource_name,
     name,
     idIndex,
@@ -449,11 +469,17 @@ async function handleDataRequest(
   }
 
   const schemaUrl = buildUrl(API_BASE_URL, ["schemas", resource_name, "$name"]);
-  return createSuccessResponse({ data: result }, 200, "OK", {
-    Link: `<${schemaUrl}>; rel="describedby"`,
-    ETag: formatEtag(hash),
-    "Content-Type": "application/schema-instance+json",
-  });
+  return createSuccessResponse(
+    { data: result },
+    200,
+    "OK",
+    {
+      Link: `<${schemaUrl}>; rel="describedby"`,
+      ETag: formatEtag(hash),
+      "Content-Type": "application/schema-instance+json",
+    },
+    { gzip },
+  );
 }
 
 /**
