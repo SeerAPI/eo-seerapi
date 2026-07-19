@@ -1,9 +1,9 @@
 import fs from 'fs';
 
-const API_DATA_BASE_URL = process.env.OAD_URL;
+const OAD_URL = process.env.OAD_URL;
 
 function buildApiReference() {
-    if (!API_DATA_BASE_URL) throw new Error('OAD_URL is not set');
+    if (!OAD_URL) throw new Error('OAD_URL is not set');
 
     const API_REFERENCE_HTML = `<!doctype html>
     <html>
@@ -20,7 +20,7 @@ function buildApiReference() {
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
         Scalar.createApiReference('#app', {
-        url: '${API_DATA_BASE_URL}',
+        url: '${OAD_URL}',
         })
     </script>
     </body>

@@ -1,0 +1,94 @@
+name: Fetch API Data & Deploy Makers
+
+# 从 SeerAPI/api-data 的 latest release 拉取 schemas / sharded_data，
+# 构建后部署到 EdgeOne Makers。
+# 文档: https://pages.edgeone.ai/zh/document/using-github-actions
+# 数据源: https://github.com/SeerAPI/api-data/releases/tag/latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 部署环境
+        required: true
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+  # api-data 更新后可通过 repository_dispatch 触发，例如:
+  # gh api repos/<owner>/<repo>/dispatches -f event_type=api-data-updated
+  repository_dispatch:
+    types: [api-data-updated]
+  # 可选：定时同步最新数据
+  #   schedule:
+  #     - cron: "0 4 * * *" # 每天 12:00 CST (UTC+8)
+
+concurrency:
+  group: deploy-makers-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22.11.0"
+  PROJECT_NAME: eo-seerapi
+  API_DATA_REPO: SeerAPI/api-data
+  API_DATA_TAG: latest
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Download schemas & sharded_data from api-data release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/api-data data
+          gh release download "${API_DATA_TAG}" \
+            --repo "${API_DATA_REPO}" \
+            --dir .tmp/api-data \
+            --pattern "schemas.tar.gz" \
+            --pattern "sharded_data.tar.gz"
+
+          # 清空旧数据后解压到 data/（归档内顶层为 schemas/、sharded_data/）
+          rm -rf data/schemas data/sharded_data
+          tar -xzf .tmp/api-data/schemas.tar.gz -C data
+          tar -xzf .tmp/api-data/sharded_data.tar.gz -C data
+
+          echo "=== data layout ==="
+          find data -maxdepth 2 -type d | sort
+          echo "schemas files: $(find data/schemas -type f | wc -l)"
+          echo "sharded_data files: $(find data/sharded_data -type f | wc -l)"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+        env:
+          OAD_URL: ${{ secrets.OAD_URL }}
+
+      - name: Deploy to EdgeOne Makers
+        run: |
+          set -euo pipefail
+          ENV_NAME="${{ github.event.inputs.environment || 'production' }}"
+          # 从项目根目录部署，以便打包 cloud-functions 与 includeFiles: data/**
+          npx edgeone makers deploy . \
+            -n "${PROJECT_NAME}" \
+            -e "${ENV_NAME}" \
+            -t "${{ secrets.EDGEONE_API_TOKEN }}" \
+            --json
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}

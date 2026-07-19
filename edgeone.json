@@ -1,6 +1,11 @@
 {
-	"name": "eo-seerapi",
-	"nodeVersion": "22.11.0",
-	"buildCommand": "npm run build",
-	"outputDirectory": "build"
+  "name": "eo-seerapi",
+  "nodeVersion": "22.11.0",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "cloudFunctions": {
+    "nodejs": {
+      "includeFiles": ["data/**"]
+    }
+  }
 }
