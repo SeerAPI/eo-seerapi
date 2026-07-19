@@ -30,7 +30,7 @@ concurrency:
 
 env:
   NODE_VERSION: "22.11.0"
-  PROJECT_NAME: eo-seerapi
+  PROJECT_NAME: eo-seerapi-upload
   API_DATA_REPO: SeerAPI/api-data
   API_DATA_TAG: latest
 
